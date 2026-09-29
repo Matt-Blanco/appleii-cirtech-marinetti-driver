@@ -1,9 +1,13 @@
-# Cirtech SCSI / Marinetti Link Layer —
+# Cirtech SCSI / Marinetti Link Layer 
 
 The following repository drives the Cirtech SCSI Interface directly, so an Apple IIgs can talk to
 non-block SCSI devices — specifically the BlueSCSI DaynaPORT processor device. The custom Link Layer allows third-party SCSI cards (like the 1988 UK Cirtech SCSI Card) to manage a network connection between [BlueSCSI](https://bluescsi.com) and [Marinetti](https://www.apple2.org/marinetti/).
 
-## Why this exists
+## Why make a driver for a 40yr old computer?
+
+I wanted to explore vintage computers and take a step back in time. My experience has primarily been in front-end development, but the history of interfaces is incredibly rich. I chose to walk down the software stack to get as low-level as possible, and to see what it would be like to resurrect a dormant computer.
+
+## Why a Custom Driver is Needed
 
 Existing drivers to use the BlueSCSI with an Apple II expect SCSI cards manufactured by Apple and not third-party SCSI cards. For anyone with a third-party SCSI card, you can now expand the capabilities of an Apple II.
 
@@ -140,11 +144,8 @@ and then resets it with the card's own SmartPort INIT call.
 
 - `~/Downloads/Cirtech SCSI/Cirtech SCSI User's Manual.pdf` — chapter 6 has the ID
   bytes, FAST/SAFE modes, the ProDOS block protocol and the SmartPort call format.
-- `../scsi2/manuals/SCSI-2 Driver ERS v202608.pdf` — GS/OS driver structure, and
-  every CDB the BlueSCSI toolbox uses.
-- `../scsi2/bluescsi.s` — working command sequences, as GS/OS calls.
-- `../scsi2/other/dayna/SLINKCMD.txt` — the DaynaPort SCSI/Link command set. The
-  authority for `$08`, `$09`, `$0A`, `$0C` and `$0E`.
+- [`github.com/antoinevignau/source/tree/main/scsi2`](github.com/antoinevignau/source/tree/main/scsi2) — GS/OS driver structure, and
+  every CDB the BlueSCSI toolbox uses, working command sequences, as GS/OS calls,  the DaynaPort SCSI/Link command set. The authority for `$08`, `$09`, `$0A`, `$0C` and `$0E`.
 - BlueSCSI toolbox docs: https://github.com/BlueSCSI/BlueSCSI-v2/wiki/Toolbox-Developer-Docs
 
 ## Acknowledgements
@@ -156,3 +157,4 @@ The following work would not have been possible without the existing Apple II de
 - <em>[Nikolai Kozak](https://nkozak.com/about)</em> for introducing me to the BlueSCSI
 - <em>[AppleFritter](https://www.applefritter.com/forum/84)</em> the forum used to find answers to obscure questions
 - <em>[Speccie's Software Archive](https://speccie.uk/software/)</em> for providing software tools to compile assembly and the starter disk containing a Marinetti installation 
+- <em>[Zachary Blano](https://blanco.io)</em> For finding an Apple II at a garage sale in ~2010
