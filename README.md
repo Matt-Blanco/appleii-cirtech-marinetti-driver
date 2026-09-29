@@ -101,6 +101,16 @@ image (Cadius reads it when it copies the file in).
 - BlueSCSI V2
   - With a network card file labelled as `NE3.hda`
   - `bluescsi.ini` with WiFi configured
+  ```
+  [SCSI]
+  WiFiSSID=[Your WiFi Name]
+  WiFiPassword=[Your Wifi Password]
+  Debug=0
+  EnableToolbox=1	; Enabled
+  [SCSI2]
+  Vendor=Dayna
+  Product=SCSI/Link
+  ```
 - A Cirtech SCSI Card
   - Placed in expandable card Slot 7
 
@@ -108,40 +118,9 @@ image (Cadius reads it when it copies the file in).
 
 Place the `BlueSCSILink.po` or `BlueSCSILink.2mg` file onto your Apple II disk and run the `INSTALLER.SYS` file to copy the `BSLINK` Marinetti Link Layer into the `SYSTEM:TCPIP` folder of your GS/OS boot drive. For more manual installation follow the below steps:
 
-`_FileInformation.txt` is metadata for Cadius. It never goes onto the image — it
-only tells Cadius which ProDOS type and aux type to stamp on the file it copies.
-`tools/prodos_add.py` takes those on the command line instead, so neither Cadius
-nor AppleCommander is needed:
+To install the link layer without the installer, `/src/compiled/BSLink` should be moved onto a ProDOS disk using CiderPress or DiskJockey under the `SYSTEM:TCPIP` folder.
 
-```
-cp ~/Downloads/Cirtech\ SCSI/Cirtech\ SCSI\ 800k.PO "disk/FD40_512 probe.po"
-python3 tools/prodos_add.py "disk/FD40_512 probe.po" \
-        src/compiled/ProbeCompiled PROBE 0x06 0x2000
-```
-
-`disk/FD40_512 probe.po` is that image, already built: the Cirtech utility disk
-(ProDOS 8 and BASIC.SYSTEM) with `PROBE` added as BIN, aux `$2000`. Its volume is
-renamed to `/PROBE` so it can't clash with the original `/SC`.
-
-The filename is the BlueSCSI convention: `FD` floppy, SCSI ID `4`, LUN `0`, 512
-byte blocks. IDs 3, 5 and 6 are in use, so 4 is free.
-
-To run it:
-
-1. Put the BlueSCSI in USB mass storage mode and copy `FD40_512 probe.po` to the
-   root of the SD card. Back the card up while you're there.
-2. Boot the IIgs and get to a ProDOS 8 BASIC prompt. From GS/OS, launch
-   `BASIC.SYSTEM` from the Finder; the copy on `/PROBE` will do.
-3. At the `]` prompt:
-
-```
-]PREFIX /PROBE
-]BRUN PROBE
-```
-
-The Cirtech ROM boots whichever device has the highest SCSI ID, currently ID 6.
-To make this disk boot directly instead, give it the highest ID and move the
-current boot image below it.
+A connection can also be tested with the `PING` application. After the network has been configured in the TCP/IP Control Panel, the application can be run to test a connection between a modern computer and the Apple IIgs. 
 
 ## Safety
 
@@ -165,9 +144,9 @@ and then resets it with the card's own SmartPort INIT call.
 
 The following work would not have been possible without the existing Apple II development community. Thank you to:
 
-- <em>Thomas ...</em> for providing the Cirtech SCSI card and responding to all of my questions
+- <em>Thomas Shreeve</em> for providing the Cirtech SCSI card and responding to all of my questions
 - <em>[Brutal Delux Software](https://brutaldeluxe.fr/)</em> for developing the initial drivers for the BlueSCSI and Apple IIgs
 - <em>[AppleFritter](https://www.applefritter.com/forum/84)</em> the forum used to find answers to obscure questions
 - <em>[Speccie's Software Archive](https://speccie.uk/software/)</em> for providing software tools to compile assembly and the starter disk containing a Marinetti installation 
 - <em>[Nikolai Kozak](https://nkozak.com/about)</em> for introducing me to the BlueSCSI
-- <em>[Zachary Blano](https://blanco.io)</em> For finding an Apple II at a garage sale in ~2010
+- <em>[Zachary Blanco](https://blanco.io)</em> for finding an Apple II at a garage sale in ~2010
