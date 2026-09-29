@@ -1,12 +1,13 @@
-# Cirtech SCSI — custom driver work
+# Cirtech SCSI / Marinetti Link Layer —
 
-Driving the Cirtech SCSI Interface directly, so an Apple IIgs can talk to
-non-block SCSI devices — specifically the BlueSCSI DaynaPORT processor device.
+The following repository drives the Cirtech SCSI Interface directly, so an Apple IIgs can talk to
+non-block SCSI devices — specifically the BlueSCSI DaynaPORT processor device. The custom Link Layer allows third-party SCSI cards (like the 1988 UK Cirtech SCSI Card) to manage a network connection between [BlueSCSI](https://bluescsi.com) and [Marinetti](https://www.apple2.org/marinetti/).
 
 ## Why this exists
 
-The GS/OS SCSI drivers in `../scsi2` (`SCSIProc.Driver`, `SCSICOMM.Driver`) reach
-the bus through Apple's `SCSI.Manager`, which only drives Apple's own SCSI cards.
+Existing drivers to use the BlueSCSI with an Apple II expect SCSI cards manufactured by Apple and not third-party SCSI cards. For anyone with a third-party SCSI card, you can now expand the capabilities of an Apple II.
+
+Existing GS/OS drivers reach through the bus, which only drives Apple's own SCSI cards.
 On a Cirtech card they load, find no devices and go quiet.
 
 The Cirtech ROM itself is no help either. Its published interfaces are the ProDOS
@@ -32,7 +33,8 @@ src/     scsicore.s    - the working transport, PUT into the programs below
          probe.s       - milestone 1: find the card, select a target
          inquiry.s     - milestone 2: a full INQUIRY command
          toolbox.s     - milestone 3a: BlueSCSI metadata $D9/$01
-disk/    FD40_512 probe.po - bootable ProDOS 8 disk with all three
+disk/    BlueSCSILink.po   - bootable ProDOS 8 disk with all three
+         FD60_512 probe.po - Test disk containing all iterations of the custom link layer.
 ```
 
 Regenerate the disassembly with:
@@ -50,7 +52,7 @@ tables. When a routine looks like nonsense, disassemble from its entry point:
 python3 tools/dis6502.py rom/cirtech_scsi_2764.bin 0xAFB 0x105 0xCAFB
 ```
 
-## What we know
+## About the Hardware
 
 Full detail in `docs/hardware.md`. In short:
 
@@ -66,163 +68,9 @@ Full detail in `docs/hardware.md`. In short:
 - **Verified on hardware.** A full INQUIRY to the DaynaPORT at ID 3 returned
   `Dayna` / `SCSI/Link` with status GOOD.
 
-## Roadmap
-
-**Milestone 1 — prove the register map. DONE 2026-09-22.** `src/probe.s`. Finds
-the card, reports FAST or SAFE, selects the target. Selection of ID 3 returned
-bus status `$68`: BSY, REQ, phase 2, command out.
-
-**Milestone 2 — arbitrary CDB. DONE 2026-09-22.** `src/inquiry.s`. Command out,
-data in, status and message in. INQUIRY returned 36 bytes: device type `$03`
-processor, vendor `Dayna`, product `SCSI/Link`, status `$00`, message `$00`.
-
-**Milestone 3 — the BlueSCSI toolbox and the network. DONE 2026-09-23.** An ARP
-request went out and its reply came back, read off the DaynaPORT byte for byte.
-Every SCSI phase is exercised: command out, data in, data out, status, message
-in. See "Hardware results" in `docs/hardware.md`.
-
-Lesson worth keeping: test against an access point you control. A managed
-network that drops frames from an unleased source address looks exactly like
-broken code, and cost us several rounds.
-
-**Milestone 3 (detail) — the BlueSCSI toolbox.** The transport now lives in
-`src/scsicore.s` as a `PUT` include: a program fills `cdb`/`cdbLEN`, and
-`outBUF`/`outLEN` for a data-out command, then calls `runSCSI`. Results come back
-in `buf`/`datIDX`, `status` and `message`.
-
-- `src/toolbox.s` — metadata `$D9` sub-command `$01`. **DONE 2026-09-22:** API
-  version 0, capabilities `$07` (large transfers, large send, working dir). A
-  10-byte CDB, after INQUIRY proved a 6-byte one.
-- `src/wifi.s` — Receive Diagnostic `$1C` sub-command `$04`, Wi-Fi info.
-  **DONE 2026-09-23:** 76 bytes, SSID `sandbox370` at offset 2, in the
-  scan-result entry format behind a two-byte header.
-- `src/netrecv.s` — the real DaynaPORT sequence: enable `$0E`, wait, statistics
-  `$09` for the MAC, then read `$08` repeatedly. A first version that just sent
-  `$08` returned nothing but zeros, because the interface was never enabled and
-  byte 5 of the read CDB was `00` instead of `C0`. **Ready to test.**
-- Next: Send `$0A`, the first command needing a **data-out** phase. The core
-  handles that phase but has not exercised it yet.
-
-`../scsi2/bluescsi.s` has all of these as GS/OS DControl and DStatus calls. The
-CDBs carry over unchanged; only the transport differs.
-
-**Milestone 4 — the Marinetti link layer. DISPATCHER PROVEN 2026-09-24.**
-`link/modtest.s` assembles the module into a ProDOS 8 binary and calls it with
-the documented register convention, so it can be tested without GS/OS - which
-matters, because a module that hangs takes the boot with it and has to be
-deleted from outside (`tools/prodos_rm.py`).
-
-`LinkInterfaceV` and `LinkModuleInfo`, the two calls Marinetti makes while
-building its list, now run and return cleanly, with a correct 29-byte info
-block: method ID, a 21-byte name field, rVersion longword and flags.
-
-The module reports `conTest` ($0005), the ID the Programmers' Guide reserves
-for development. A public release needs its own ID from Marinetti's author.
-
-Five bugs were found getting there, every one a register-width or stack
-arithmetic error that assembled without complaint:
-
-1. `phb` left the caller's data bank byte above the return address
-2. `jsr (dispatch,x)` put its own return address on top of the parameters
-3. handlers assembled 8-bit because the assembler's width tracking arrives in
-   source order, and `exitLINK` ends 8-bit - `lda #$0001` became `A9 01`
-4. `netENABLE` inherited 8-bit from the routine above it, and its flag store
-   was 16-bit, running into the next CDB
-5. `exitLINK` saved the flags *after* narrowing the accumulator, so every call
-   returned with the caller's register widths changed
-
-Assembling with `lst on` and auditing the listing is what found 3, 4 and 5.
-The checks worth repeating after any change: every immediate's emitted size
-matches its operand, every width-sensitive routine prologue matches its
-callers, no 16-bit store lands in a byte field, and `php` precedes any width
-change on an exit path.
-
-**Milestone 4 (original note) — the Marinetti link layer.** `link/`
-holds `BSLink`, an OMF module of type `$BC` auxtype `$4083`, which is what
-Marinetti loads from `*:System:TCPIP` (Programmers' Guide, page 131).
-
-```
-link/bslink.s       the twelve interface calls and the dispatcher
-link/scsi16.s       the proven transport, ported to 65816
-link/arp.s          ethernet framing, ARP, and a four entry cache
-link/make_bslink.s  linker file: TYP $BC, AUX $4083
-```
-
-Marinetti deals only in IP, so everything below it belongs to the module:
-ethernet framing, and ARP both ways — answering requests for our address and
-resolving the address we are sending to. Addressing is static for now, read
-from the connect data; DHCP would have to run down here too.
-
-Build and install:
-
-```
-merlin32 . link/make_bslink.s
-```
-
-then copy `BSLink` (it is on the transfer disk as `BSLINK`) into
-`*:System:TCPIP` on the GS/OS boot volume, and pick it in the TCP/IP control
-panel.
-
-`src/installer/install.s` does the copy on the IIgs. It is `INSTALL.SYSTEM` on
-the transfer disk: launch it from the Finder, or from BASIC.SYSTEM with
-`-INSTALL.SYSTEM` once the prefix is `/PROBE`. ProDOS 8 can't tell which volume
-GS/OS booted from, so it offers each online volume with a `SYSTEM/TCPIP`
-directory and asks before replacing an existing `BSLINK`. If the copy fails, it
-deletes the partial file. To rebuild it and put it on the disk:
-
-```
-merlin32 . src/installer/install.s
-python3 tools/prodos_rm.py "disk/FD60_512 probe.po" /INSTALL.SYSTEM
-python3 tools/prodos_add.py "disk/FD60_512 probe.po" \
-        src/installer/InstallSystem INSTALL.SYSTEM 0xFF 0x2000
-```
-
-Marinetti loads every `$BC`/`$4083` file in `TCPIP`, so remove any test builds
-(`BSLINKT13` and the like) from there by hand.
-
-`disk/BlueSCSILink.po` is the disk to give other people. It is a bootable 800K
-ProDOS volume, `/BLUESCSILINK`, and holds only what installation needs:
-
-```
-PRODOS          ProDOS 8 v1.7, taken from the Cirtech disk with its boot blocks
-INSTALL.SYSTEM  the installer, first .SYSTEM file, so booting the disk runs it
-BSLINK          link/BSLink
-README          src/installer/README.txt, a TXT file that opens in Teach
-```
-
-Rebuild it after changing any of those files:
-
-```
-python3 tools/prodos_new.py disk/BlueSCSILink.po BLUESCSILINK 1600 \
-        --boot "disk/FD60_512 probe.po"
-python3 tools/prodos_add.py disk/BlueSCSILink.po \
-        src/installer/InstallSystem INSTALL.SYSTEM 0xFF 0x2000
-python3 tools/prodos_add.py disk/BlueSCSILink.po link/BSLink BSLINK 0xBC 0x4083
-python3 tools/prodos_add.py disk/BlueSCSILink.po \
-        src/installer/README.txt README 0x04 0x0000 --text
-```
-
-`prodos_new.py` overwrites the image, so the four commands always rebuild it
-from scratch. `--text` changes the README's line feeds to the carriage returns
-that ProDOS text files use.
-
-`LinkConfigure` currently just fills in defaults matching the Mac
-Internet Sharing setup the transport was proven against: 192.168.2.99,
-255.255.255.0, gateway 192.168.2.1.
-
-Two things to expect on first run: the module has never executed on a IIgs, and
-the transfer loop is byte-at-a-time, which was enough for ARP but will be the
-first thing to strain under real traffic.
-
-**Milestone 5 — package it further.** Either a GS/OS driver (file type `$BB`, aux `$01xx`,
-structure in the SCSI-2 ERS under "Physical Structure of an SCSI Driver") that
-presents the device the way `SCSIProc.Driver` would, or go straight to a Marinetti
-link layer that owns the card directly. The driver route is more work but means
-existing software keeps working.
-
 ## Building
 
-The sources are Merlin syntax, plain 6502, ProDOS 8, origin `$2000`. `probe.s` is
+The sources are [Merlin](https://brutaldeluxe.fr/products/crossdevtools/merlin/) syntax, plain 6502, ProDOS 8, origin `$2000`. `probe.s` is
 self-contained; `inquiry.s` and `toolbox.s` end with `PUT scsicore`.
 
 ```
@@ -298,3 +146,13 @@ and then resets it with the card's own SmartPort INIT call.
 - `../scsi2/other/dayna/SLINKCMD.txt` — the DaynaPort SCSI/Link command set. The
   authority for `$08`, `$09`, `$0A`, `$0C` and `$0E`.
 - BlueSCSI toolbox docs: https://github.com/BlueSCSI/BlueSCSI-v2/wiki/Toolbox-Developer-Docs
+
+## Acknowledgements
+
+The following work would not have been possible without the existing Apple II development community. Thank you to:
+
+- <em>Thomas ...</em> for providing the Cirtech SCSI card and responding to all of my questions
+- <em>[Brutal Delux Software](https://brutaldeluxe.fr/)</em> for developing the initial drivers for the BlueSCSI and Apple IIgs
+- <em>[Nikolai Kozak](https://nkozak.com/about)</em> for introducing me to the BlueSCSI
+- <em>[AppleFritter](https://www.applefritter.com/forum/84)</em> the forum used to find answers to obscure questions
+- <em>[Speccie's Software Archive](https://speccie.uk/software/)</em> for providing software tools to compile assembly and the starter disk containing a Marinetti installation 
