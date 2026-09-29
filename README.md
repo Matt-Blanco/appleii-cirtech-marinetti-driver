@@ -93,7 +93,20 @@ match the `org`, otherwise BRUN loads the code at `$0000` and the machine hangs.
 Merlin32 rewrites that file on every assembly, so check it before building a disk
 image (Cadius reads it when it copies the file in).
 
-## Putting it on a disk
+## Requirements
+
+- An Apple IIgs
+- GS/OS
+  - System 6.0.1 or System 6.0.4 
+- BlueSCSI V2
+  - With a network card file labelled as `NE3.hda`
+  - `bluescsi.ini` with WiFi configured
+- A Cirtech SCSI Card
+  - Placed in expandable card Slot 7
+
+## Installation
+
+Place the `BlueSCSILink.po` or `BlueSCSILink.2mg` file onto your Apple II disk and run the `INSTALLER.SYS` file to copy the `BSLINK` Marinetti Link Layer into the `SYSTEM:TCPIP` folder of your GS/OS boot drive. For more manual installation follow the below steps:
 
 `_FileInformation.txt` is metadata for Cadius. It never goes onto the image — it
 only tells Cadius which ProDOS type and aux type to stamp on the file it copies.
@@ -154,7 +167,7 @@ The following work would not have been possible without the existing Apple II de
 
 - <em>Thomas ...</em> for providing the Cirtech SCSI card and responding to all of my questions
 - <em>[Brutal Delux Software](https://brutaldeluxe.fr/)</em> for developing the initial drivers for the BlueSCSI and Apple IIgs
-- <em>[Nikolai Kozak](https://nkozak.com/about)</em> for introducing me to the BlueSCSI
 - <em>[AppleFritter](https://www.applefritter.com/forum/84)</em> the forum used to find answers to obscure questions
 - <em>[Speccie's Software Archive](https://speccie.uk/software/)</em> for providing software tools to compile assembly and the starter disk containing a Marinetti installation 
+- <em>[Nikolai Kozak](https://nkozak.com/about)</em> for introducing me to the BlueSCSI
 - <em>[Zachary Blano](https://blanco.io)</em> For finding an Apple II at a garage sale in ~2010
